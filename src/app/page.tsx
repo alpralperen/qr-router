@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link, Pencil, Trash2, Plus, ExternalLink, QrCode } from "lucide-react";
+import { Link as LinkIcon, Pencil, Trash2, Plus, ExternalLink, QrCode, Copy, CheckCircle2, Download } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 type RouterQr = {
   id: string;
@@ -18,9 +19,15 @@ export default function AdminPage() {
   
   const [formData, setFormData] = useState({ id: "", slug: "", targetUrl: "", name: "" });
   const [isEditing, setIsEditing] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [qrModalSlug, setQrModalSlug] = useState<string | null>(null);
+  const [originUrl, setOriginUrl] = useState("");
 
   useEffect(() => {
     fetchRouters();
+    if (typeof window !== "undefined") {
+      setOriginUrl(window.location.origin);
+    }
   }, []);
 
   const fetchRouters = async () => {
@@ -91,6 +98,25 @@ export default function AdminPage() {
     }
   };
 
+  const handleCopy = (slug: string, id: string) => {
+    const fullUrl = `${originUrl}/r/${slug}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const downloadQR = (slug: string) => {
+    const canvas = document.getElementById(`qr-code-${slug}`) as HTMLCanvasElement;
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `qr-${slug}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-8 font-sans">
       <div className="max-w-6xl mx-auto">
@@ -130,8 +156,8 @@ export default function AdminPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {routers.map((router) => (
-              <div key={router.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
-                <div className="p-6">
+              <div key={router.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col group">
+                <div className="p-6 flex-grow">
                   <div className="flex justify-between items-start mb-4">
                     <h2 className="text-lg font-semibold text-gray-800 line-clamp-1">{router.name || router.slug}</h2>
                     <span className="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-md font-mono">{router.slug}</span>
@@ -167,16 +193,36 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                  <span className="text-xs text-gray-500 font-mono">/r/{router.slug}</span>
+                
+                {/* Alt Kısım - URL ve Kopyalama */}
+                <div className="bg-gray-50 px-5 py-4 border-t border-gray-100 rounded-b-2xl">
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-2">QR İçin Tam Bağlantı</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-grow bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 font-mono overflow-hidden whitespace-nowrap text-ellipsis">
+                      {originUrl}/r/{router.slug}
+                    </div>
+                    <button 
+                      onClick={() => handleCopy(router.slug, router.id)}
+                      className="flex-shrink-0 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 p-2 rounded-lg transition-all"
+                      title="Linki Kopyala"
+                    >
+                      {copiedId === router.id ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setQrModalSlug(router.slug)}
+                    className="mt-3 w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <QrCode size={16} />
+                    QR Kodu Üret ve İndir
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Modal */}
+        {/* Ekle/Düzenle Modal */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
             <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -241,6 +287,42 @@ export default function AdminPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* QR Kod Görüntüleme Modalı */}
+        {qrModalSlug && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">QR Kodunuz Hazır</h3>
+              <p className="text-sm text-gray-500 mb-6">Bu kodu indirip matbaada bastırabilirsiniz.</p>
+              
+              <div className="bg-white p-4 rounded-xl border-2 border-gray-100 shadow-sm mb-6 inline-block">
+                <QRCodeCanvas 
+                  id={`qr-code-${qrModalSlug}`}
+                  value={`${originUrl}/r/${qrModalSlug}`}
+                  size={200}
+                  level={"H"}
+                  includeMargin={true}
+                />
+              </div>
+
+              <div className="w-full flex gap-3">
+                <button 
+                  onClick={() => setQrModalSlug(null)}
+                  className="flex-1 px-4 py-2.5 text-gray-600 font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  Kapat
+                </button>
+                <button 
+                  onClick={() => downloadQR(qrModalSlug)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-md"
+                >
+                  <Download size={18} />
+                  İndir (PNG)
+                </button>
+              </div>
             </div>
           </div>
         )}
