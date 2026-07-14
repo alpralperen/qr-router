@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   // Sadece ana sayfa ve admin API'leri için şifre koruması uygula
   // Yönlendirme rotası (/r/[slug]) herkese açık kalmalı
   if (req.nextUrl.pathname === '/' || req.nextUrl.pathname.startsWith('/api/routers')) {
