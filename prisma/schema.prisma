@@ -1,0 +1,19 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RouterQr {
+  id        String   @id @default(cuid())
+  slug      String   @unique // URL'de görünecek id, örn: demo1
+  targetUrl String   // Yönlendirilecek URL, örn: https://demo1.vercel.app
+  name      String?  // Yönetim panelinde ayırt etmek için, örn: Starbucks Demo
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
